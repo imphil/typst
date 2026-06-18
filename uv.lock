@@ -140,7 +140,7 @@ requires-dist = [
     { name = "rst2typst", specifier = ">=0.5.1" },
     { name = "sphinx", specifier = ">=8.1" },
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.2.1" },
-    { name = "typst", marker = "extra == 'pdf'", specifier = ">=0.13.2" },
+    { name = "typst", marker = "extra == 'pdf'", specifier = ">=0.15.0" },
 ]
 provides-extras = ["pdf"]
 

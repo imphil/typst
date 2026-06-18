@@ -47,7 +47,7 @@ typstpdf = "atsphinx.typst"
 
 [project.optional-dependencies]
 pdf = [
-    "typst>=0.13.2",
+    "typst>=0.15.0",
 ]
 
 [build-system]

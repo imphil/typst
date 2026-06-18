@@ -39,6 +39,9 @@ class TypstBuilder(Builder):
         super().__init__(app, env)
         self._static_dir = Path(self.outdir / "_static")
         self._images_dir = Path(self.outdir / "_images")
+        # Place Typst package cache (for @preview packages) in the build output
+        # directory to ensure they stay isolated from other typst environments.
+        self._typst_package_cache_dir = Path(self.outdir / "_package_cache")
         self._build_date = date.today()
 
     def init(self):  # noqa: D102
@@ -181,6 +184,6 @@ class TypstPDFBuilder(TypstBuilder):
             src = Path(self.outdir) / f"{document_settings['filename']}.typ"
             out = Path(self.outdir) / f"{document_settings['filename']}.pdf"
             try:
-                typst.compile(src, output=out, **kwargs)
+                typst.compile(src, output=out, package_cache_path=self._typst_package_cache_dir, **kwargs)
             except typst.TypstError as e:
                 raise SphinxError(f"Typst compilation failed for {str(src)!r}: {e.diagnostic}") from e
