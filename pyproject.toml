@@ -61,6 +61,7 @@ dev = [
     "doc8",
     "esbonio",
     "ruff",
+    "sphinxcontrib-mermaid>=2.0.2",
     "ty",
 ]
 docs = [
