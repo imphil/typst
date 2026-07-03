@@ -235,6 +235,23 @@ class TypstTranslator(SphinxTranslator, BaseTypstTranslator):
         self._hi.pop()
         self.body.append(f"{self._hi.indent}],\n")
 
+    def visit_glossary(self, node: addnodes.glossary):
+        pass
+
+    def depart_glossary(self, node: addnodes.glossary):
+        pass
+
+    def depart_term(self, node: nodes.term):
+        # Glossary terms carry an id (e.g. "term-alpha") used by :term: xrefs.
+        # Emit a Typst label so those links have a target, namespaced per document
+        # the same way section and desc_signature labels are.
+        ids = node.get("ids", [])
+        if ids:
+            docname = _doc_label(self.curfilestack[-1])
+            self.body.append(f" <{docname}:{ids[0]}>")
+            for node_id in ids[1:]:
+                self._write_anchor(f"{docname}:{node_id}")
+
     def visit_index(self, node: addnodes.index):
         # NOTE: This is very simple implementation.
         #   There may be a more correct implementation.
@@ -247,13 +264,17 @@ class TypstTranslator(SphinxTranslator, BaseTypstTranslator):
         self.context["has_index"] = True
         for entry in node.get("entries", []):
             entrytype, entryname, _target, _ignored, _key = entry
-            if entrytype != "pair":
-                logger.info("Currently, it only suports 'pair' typed entries.")
+            if entrytype not in {"single", "pair"}:
+                logger.info("Currently, it only suports 'single' and 'pair' typed entries.")
                 continue
 
             parts = split_index_msg(entrytype, entryname)
-            index_name, index_group = parts
-            index_path = f'"{_escape(index_group)}", "{_escape(index_name)}"'
+            if entrytype == "single":
+                index_name = parts[0]
+                index_path = f'"{_escape(index_name)}"'
+            else:
+                index_name, index_group = parts
+                index_path = f'"{_escape(index_group)}", "{_escape(index_name)}"'
             self.body.append(f"#index({index_path}, apply-casing: false)")
 
     def depart_index(self, node: addnodes.index):

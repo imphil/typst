@@ -65,3 +65,43 @@ class Test_TypstTranslator:
             out = app.outdir / "index.typ"
             assert out.exists()
             mock_logger.warning.assert_called_once()
+
+    class Test_glossary:
+        @pytest.mark.sphinx("typst", testroot="with-glossary")
+        def test__build_succeeds(self, app):
+            """Building a doc with a ``.. glossary::`` must not raise NotImplementedError."""
+            app.build()
+            assert (app.outdir / "index.typ").exists()
+
+        @pytest.mark.sphinx("typst", testroot="with-glossary")
+        def test__term_text_appears(self, app):
+            """Glossary term text must be present in the Typst output."""
+            app.build()
+            content = (app.outdir / "index.typ").read_text()
+            assert "Alpha" in content
+            assert "Beta" in content
+
+        @pytest.mark.sphinx("typst", testroot="with-glossary")
+        def test__term_labels_are_emitted(self, app):
+            """Each glossary term must emit a Typst label so ``:term:`` links resolve."""
+            app.build()
+            content = (app.outdir / "index.typ").read_text()
+            assert "<index:term-Alpha>" in content
+            assert "<index:term-Beta>" in content
+
+        @pytest.mark.sphinx("typst", testroot="with-glossary")
+        def test__term_references_link_to_labels(self, app):
+            """``:term:`` roles must produce ``#link`` calls pointing at the term labels."""
+            app.build()
+            content = (app.outdir / "index.typ").read_text()
+            assert "#link(<index:term-Alpha>)" in content
+            assert "#link(<index:term-Beta>)" in content
+
+        @pytest.mark.sphinx("typst", testroot="with-glossary")
+        def test__glossary_build_emits_no_non_pair_index_warning(self, app, capsys):
+            """Glossary builds must not log the unsupported non-pair index-entry warning."""
+            app.build()
+            captured = capsys.readouterr()
+            assert (
+                "Currently, it only suports 'pair' typed entries." not in captured.out
+            )
