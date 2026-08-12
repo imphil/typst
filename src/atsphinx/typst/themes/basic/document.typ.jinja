@@ -40,6 +40,10 @@
 #set text(font: "{{ font }}")
 {% endif %}
 
+{# Global configuration #}
+{# Allow pagebreaks in tables, even if they are wrapped in a figure (the default) #}
+#show figure: set block(breakable: true)
+
 {# Layout definitions #}
 {% include 'layout.typ' %}
 {% endblock %}
