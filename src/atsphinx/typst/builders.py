@@ -200,7 +200,10 @@ class TypstPDFBuilder(TypstBuilder):
 
         super().finish()
         install_package(rst2typst_package_dir, "rst2typst")
-        install_package(typst_package_dir, "atsphinx-typst")
+        # Force: the local package version tracks the Python package version,
+        # so a copy left over from an older build of the same version would
+        # silently miss whatever the current writer emits.
+        install_package(typst_package_dir, "atsphinx-typst", force=True)
         kwargs = {}
         if self.config.typst_font_paths:
             kwargs["font_paths"] = self.config.typst_font_paths
