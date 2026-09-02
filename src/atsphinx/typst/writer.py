@@ -12,6 +12,7 @@ Order of definitions.
 
 from __future__ import annotations
 
+import re
 from importlib import metadata
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -59,6 +60,29 @@ def _doc_label(docname: str) -> str:
     # Merged into one Typst file, so labels need a per-document namespace
     # to avoid id collisions (e.g. two "Installation" sections).
     return docname.replace("/", ":")
+
+
+# Typst label identifiers only allow [A-Za-z0-9_.:\->]; everything else
+# (spaces, ~, (, ), [, ], \, comma, ...) produces an "unclosed label" error.
+# Sphinx domains — notably C++ — attach raw human-readable ids to nodes
+# without normalising them the way docutils.nodes.make_id() would, so we
+# must do the same job the LaTeX builder's idescape() does: replace every
+# invalid character with a safe substitute.
+# '_' is chosen because it is already valid, is never produced by the
+# substitution rule itself, and therefore cannot introduce new collisions
+# between two previously distinct node ids.
+_INVALID_LABEL_CHARS = re.compile(r"[^A-Za-z0-9_.:\-]")
+
+
+def _sanitize_label_id(node_id: str) -> str:
+    """Replace characters that are invalid in a Typst label identifier with ``_``.
+
+    Typst labels allow ``[A-Za-z0-9_.:\\->]``.  Any other character — for
+    example ``~`` in a C++ destructor id, ``<``/``>`` in a C++ template
+    specialisation, or plain spaces — must be replaced.  We use ``_`` as the
+    replacement (same convention as the Sphinx LaTeX builder's ``idescape()``).
+    """
+    return _INVALID_LABEL_CHARS.sub("_", node_id)
 
 
 class TypstTranslator(SphinxTranslator, BaseTypstTranslator):
@@ -112,7 +136,7 @@ class TypstTranslator(SphinxTranslator, BaseTypstTranslator):
         if isinstance(node.parent, nodes.section):
             docname = _doc_label(self.curfilestack[-1])
             for node_id in node.parent.get("ids", [])[1:]:
-                self._write_anchor(f"{docname}:{node_id}")
+                self._write_anchor(f"{docname}:{_sanitize_label_id(node_id)}")
 
         super().visit_title(node)
 
@@ -126,7 +150,7 @@ class TypstTranslator(SphinxTranslator, BaseTypstTranslator):
 
         if ids:
             # Label goes after the title text, before the newline: == Title <label>
-            self.body.append(f" <{docname}:{ids[0]}>")
+            self.body.append(f" <{docname}:{_sanitize_label_id(ids[0])}>")
 
         super().depart_title(node)
 
@@ -161,7 +185,7 @@ class TypstTranslator(SphinxTranslator, BaseTypstTranslator):
         # ``internal``: plain anchor refs (RST `Title`_, MyST #anchor) get
         # refid without Sphinx ever setting ``internal``.
         if "refid" in node:
-            uri = f"{_doc_label(self.curfilestack[-1])}:{node['refid']}"
+            uri = f"{_doc_label(self.curfilestack[-1])}:{_sanitize_label_id(node['refid'])}"
         elif node.get("internal", False):
             # Sphinx-resolved cross-doc reference, shaped "docname" or
             # "docname#labelid".
@@ -172,7 +196,7 @@ class TypstTranslator(SphinxTranslator, BaseTypstTranslator):
             docname, _, labelid = node["refuri"].partition("#")
             uri = _doc_label(docname)
             if labelid:
-                uri += f":{labelid}"
+                uri += f":{_sanitize_label_id(labelid)}"
         else:
             # Plain external hyperlink - nothing to namespace.
             return super().visit_reference(node)
@@ -197,14 +221,14 @@ class TypstTranslator(SphinxTranslator, BaseTypstTranslator):
             # Forwarded onto a node with no id-handling of its own (e.g. a
             # paragraph, or a desc - depart_desc_signature only anchors the
             # signature's own ids). Nothing else emits this, so do it here.
-            self._write_anchor(f"{docname}:{node['refid']}")
+            self._write_anchor(f"{docname}:{_sanitize_label_id(node['refid'])}")
             raise nodes.SkipNode
 
         # A standalone target PropagateTargets left untouched (e.g. one at
         # the end of a document) - anchor it directly, like ids[1:] above.
         target_id = node["ids"][0] if node.get("ids") else None
         if target_id:
-            self._write_anchor(f"{docname}:{target_id}")
+            self._write_anchor(f"{docname}:{_sanitize_label_id(target_id)}")
         raise nodes.SkipNode
 
     # Implements for Sphinx's nodes
@@ -261,7 +285,7 @@ class TypstTranslator(SphinxTranslator, BaseTypstTranslator):
         docname = _doc_label(self.curfilestack[-1])
         ids = node.get("ids", [])
         if ids:
-            self.body.append(f" <{docname}:{ids[0]}>")
+            self.body.append(f" <{docname}:{_sanitize_label_id(ids[0])}>")
         # Secondary ids need their own invisible anchor, and it has to stay
         # *inside* the signature's content block - the enclosing ``#desc(``
         # argument list is Typst code, where markup labels are not allowed.
@@ -269,7 +293,7 @@ class TypstTranslator(SphinxTranslator, BaseTypstTranslator):
         # whatever precedes it, so chaining them would label one element
         # repeatedly ("content labelled multiple times").
         for node_id in ids[1:]:
-            self.body.append(f"#metadata(none) <{docname}:{node_id}>")
+            self.body.append(f"#metadata(none) <{docname}:{_sanitize_label_id(node_id)}>")
         self.body.append("],\n")
         self._signature_depth -= 1
 
@@ -453,9 +477,9 @@ class TypstTranslator(SphinxTranslator, BaseTypstTranslator):
         ids = node.get("ids", [])
         if ids:
             docname = _doc_label(self.curfilestack[-1])
-            self.body.append(f" <{docname}:{ids[0]}>")
+            self.body.append(f" <{docname}:{_sanitize_label_id(ids[0])}>")
             for node_id in ids[1:]:
-                self._write_anchor(f"{docname}:{node_id}")
+                self._write_anchor(f"{docname}:{_sanitize_label_id(node_id)}")
 
     def visit_index(self, node: addnodes.index):
         # NOTE: This is very simple implementation.
